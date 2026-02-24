@@ -67,4 +67,50 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 
 ### `npm run build` fails to minify
 
+
+React Application Deployment using Docker, Jenkins & AWS EC2
+Project Overview:
+This document describes a complete DevOps CI/CD pipeline for deploying a React application using Docker,
+Jenkins, and AWS EC2.
+Tools Used:
+- Git
+- Docker
+- Docker Compose
+- Jenkins
+- AWS EC2
+- Uptime Kuma
+System Requirements:
+Ubuntu 22.04 / Amazon Linux 2
+Open Ports: 22, 80, 8080, 3001
+Dockerfile:
+FROM node:18 as build
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+Docker Compose:
+services:
+react-app:
+build: .
+container_name: react-devops
+ports:
+- "80:80"
+Deployment Steps:
+docker compose up -d --build
+Jenkins:
+Access at http://EC2_PUBLIC_IP:8080
+Create Freestyle job and add execute shell:
+docker compose down
+docker compose up -d --build
+Monitoring:
+docker run -d -p 3001:3001 --name uptime-kuma louislam/uptime-kuma
+Access:
+http://EC2_PUBLIC_IP :34.210.234.27
+http://EC2_PUBLIC_IP:8080
+http://EC2_PUBLIC_IP:3001
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
