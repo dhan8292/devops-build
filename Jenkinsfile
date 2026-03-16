@@ -21,7 +21,9 @@ pipeline {
         }
 
         stage('Push to Dev Repository') {
-            when { branch 'dev' }
+            when { 
+                   branch 'dev' 
+            }
 
             steps {
                 withCredentials([usernamePassword(
@@ -40,7 +42,9 @@ pipeline {
         }
 
         stage('Push to Prod Repository') {
-            when { branch 'master' }
+            when {
+                   branch 'master' 
+            }
 
             steps {
                 withCredentials([usernamePassword(
