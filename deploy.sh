@@ -10,5 +10,5 @@
 
   docker run -d -p 80:80 --name react-container react-devops-app
 
-  echo "Deployment completed"
+  echo "Deployment completed SUCCESSFULY"
 
