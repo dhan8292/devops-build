@@ -15,33 +15,40 @@ pipeline {
             }
         }
 
+        // ✅ BRANCH DETECTION 
         stage('Detect Branch') {
             steps {
                 script {
-                    env.ACTUAL_BRANCH = sh(
-                        script: "git rev-parse --abbrev-ref HEAD",
-                        returnStdout: true
-                    ).trim()
+                    echo "Raw GIT_BRANCH: ${env.GIT_BRANCH}"
+
+                    if (env.GIT_BRANCH) {
+                        env.ACTUAL_BRANCH = env.GIT_BRANCH.replace("origin/", "")
+                    } else {
+                        env.ACTUAL_BRANCH = "unknown"
+                    }
 
                     echo "Detected branch: ${env.ACTUAL_BRANCH}"
                 }
             }
         }
 
+        // ✅ SHOW WHERE IMAGE WILL GO
         stage('Deployment Info') {
             steps {
                 script {
                     if (env.ACTUAL_BRANCH == "dev") {
                         echo "===================================="
-                        echo "🚀 IMAGE WILL BE PUSHED TO DEV REPO"
+                        echo "🚀 PUSHING TO DEV REPOSITORY"
                         echo "Repo: ${DEV_REPO}"
                         echo "===================================="
-                    } else if (env.ACTUAL_BRANCH == "master") {
+                    } 
+                    else if (env.ACTUAL_BRANCH == "master") {
                         echo "===================================="
-                        echo "🚀 IMAGE WILL BE PUSHED TO PROD REPO"
+                        echo "🚀 PUSHING TO PROD REPOSITORY"
                         echo "Repo: ${PROD_REPO}"
                         echo "===================================="
-                    } else {
+                    } 
+                    else {
                         echo "===================================="
                         echo "⚠️ NO DEPLOYMENT FOR THIS BRANCH"
                         echo "Branch: ${env.ACTUAL_BRANCH}"
@@ -65,11 +72,13 @@ pipeline {
 
                     if (env.ACTUAL_BRANCH == "dev") {
                         repo = DEV_REPO
-                    } else if (env.ACTUAL_BRANCH == "master") {
+                    } 
+                    else if (env.ACTUAL_BRANCH == "master") {
                         repo = PROD_REPO
                     }
 
                     if (repo != "") {
+
                         withCredentials([usernamePassword(
                             credentialsId: 'dockerhub-cred',
                             usernameVariable: 'USERNAME',
@@ -83,7 +92,7 @@ pipeline {
                             """
                         }
 
-                        echo "✅ Image successfully pushed to ${repo}:${env.BUILD_NUMBER}"
+                        echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER}"
                     }
                 }
             }
