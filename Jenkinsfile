@@ -3,38 +3,34 @@ pipeline {
 
     environment {
         IMAGE_NAME = "react-devops-app"
-        DEV_REPO = "dhanu92/react-devops-dev"
-        PROD_REPO = "dhanu92/react-devops-prod"
+        DEV_REPO   = "dhanu92/react-devops-dev"
+        PROD_REPO  = "dhanu92/react-devops-prod"
     }
 
     stages {
 
+        // ✅ Checkout code
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // ✅ Detect branch reliably (fallback for detached HEAD)
+        // ✅ Detect branch reliably (works for Multibranch Pipeline)
         stage('Detect Branch') {
             steps {
                 script {
-                    if (env.GIT_BRANCH) {
-                        // Use GIT_BRANCH if set
-                        env.ACTUAL_BRANCH = env.GIT_BRANCH.replace("origin/", "")
-                    } else {
-                        // Fallback to git command
-                        env.ACTUAL_BRANCH = sh(
-                            script: 'git rev-parse --abbrev-ref HEAD',
-                            returnStdout: true
-                        ).trim()
-                    }
+                    // Multibranch Pipeline automatically sets BRANCH_NAME
+                    env.ACTUAL_BRANCH = env.BRANCH_NAME ?: sh(
+                        script: 'git rev-parse --abbrev-ref HEAD',
+                        returnStdout: true
+                    ).trim()
                     echo "Detected branch: ${env.ACTUAL_BRANCH}"
                 }
             }
         }
 
-        // ✅ Deployment info
+        // ✅ Show deployment info
         stage('Deployment Info') {
             steps {
                 script {
@@ -58,38 +54,38 @@ pipeline {
             }
         }
 
+        // ✅ Build Docker image
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $IMAGE_NAME .'
+                sh "docker build -t $IMAGE_NAME ."
             }
         }
 
+        // ✅ Push to DockerHub (only for dev or master)
         stage('Push to DockerHub') {
+            when {
+                expression {
+                    return env.ACTUAL_BRANCH == "dev" || env.ACTUAL_BRANCH == "master"
+                }
+            }
             steps {
                 script {
-                    def repo = ""
-                    if (env.ACTUAL_BRANCH == "dev") {
-                        repo = DEV_REPO
-                    } else if (env.ACTUAL_BRANCH == "master") {
-                        repo = PROD_REPO
-                    }
+                    def repo = env.ACTUAL_BRANCH == "dev" ? DEV_REPO : PROD_REPO
 
-                    if (repo != "") {
-                        withCredentials([usernamePassword(
-                            credentialsId: 'dockerhub-creds',
-                            usernameVariable: 'USERNAME',
-                            passwordVariable: 'PASSWORD'
-                        )]) {
-                            sh """
-                                echo \$PASSWORD | docker login -u \$USERNAME --password-stdin
-                                docker tag $IMAGE_NAME ${repo}:\$BUILD_NUMBER
-                                docker tag $IMAGE_NAME ${repo}:latest
-                                docker push ${repo}:\$BUILD_NUMBER
-                                docker push ${repo}:latest
-                            """
-                        }
-                        echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER} and ${repo}:latest"
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'USERNAME',
+                        passwordVariable: 'PASSWORD'
+                    )]) {
+                        sh """
+                            echo \$PASSWORD | docker login -u \$USERNAME --password-stdin
+                            docker tag $IMAGE_NAME ${repo}:\$BUILD_NUMBER
+                            docker tag $IMAGE_NAME ${repo}:latest
+                            docker push ${repo}:\$BUILD_NUMBER
+                            docker push ${repo}:latest
+                        """
                     }
+                    echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER} and ${repo}:latest"
                 }
             }
         }
