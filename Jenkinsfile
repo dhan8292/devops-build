@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         IMAGE_NAME = "react-devops-app"
-        DEV_REPO = "dockerhubusername/dev"
-        PROD_REPO = "dockerhubusername/prod"
+        DEV_REPO = "dhanu92/react-devops-dev"
+        PROD_REPO = "dhanu92/react-devops-prod"
     }
 
     stages {
