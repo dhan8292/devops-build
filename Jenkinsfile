@@ -20,47 +20,35 @@ pipeline {
             }
         }
 
-        stage('Push to Dev Repository') {
-            when { 
-                   branch 'dev' 
-            }
-
+        stage('Push Image') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-cred',
-                    usernameVariable: 'USERNAME',
-                    passwordVariable: 'PASSWORD'
-                )]) {
+                script {
+                    def repo = ""
 
-                    sh '''
-                    docker login -u $USERNAME -p $PASSWORD
-                    docker tag trend-app $DEV_REPO:latest
-                    docker push $DEV_REPO:latest
-                    '''
+                    if (env.BRANCH_NAME == "dev") {
+                        repo = DEV_REPO
+                    } else if (env.BRANCH_NAME == "master") {
+                        repo = PROD_REPO
+                    }
+
+                    if (repo != "") {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'dockerhub-cred',
+                            usernameVariable: 'USERNAME',
+                            passwordVariable: 'PASSWORD'
+                        )]) {
+
+                            sh """
+                            echo \$PASSWORD | docker login -u \$USERNAME --password-stdin
+                            docker tag trend-app \$repo:\$BUILD_NUMBER
+                            docker push \$repo:\$BUILD_NUMBER
+                            """
+                        }
+                    } else {
+                        echo "Branch not configured for deployment"
+                    }
                 }
             }
         }
-
-        stage('Push to Prod Repository') {
-            when {
-                   branch 'master' 
-            }
-
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-cred',
-                    usernameVariable: 'USERNAME',
-                    passwordVariable: 'PASSWORD'
-                )]) {
-
-                    sh '''
-                    docker login -u $USERNAME -p $PASSWORD
-                    docker tag trend-app $PROD_REPO:latest
-                    docker push $PROD_REPO:latest
-                    '''
-                }
-            }
-        }
-
     }
 }
