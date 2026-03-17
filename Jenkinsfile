@@ -2,11 +2,7 @@ pipeline {
     agent any
 
     environment {
-
-        IMAGE_NAME = "trend-app"
-
         IMAGE_NAME = "react-devops-app"
-
         DEV_REPO = "dockerhubusername/dev"
         PROD_REPO = "dockerhubusername/prod"
     }
@@ -32,24 +28,20 @@ pipeline {
             }
         }
 
-        // ✅ NEW STAGE 
         stage('Deployment Info') {
             steps {
                 script {
-
                     if (env.ACTUAL_BRANCH == "dev") {
                         echo "===================================="
                         echo "🚀 IMAGE WILL BE PUSHED TO DEV REPO"
                         echo "Repo: ${DEV_REPO}"
                         echo "===================================="
-                    }
-                    else if (env.ACTUAL_BRANCH == "master") {
+                    } else if (env.ACTUAL_BRANCH == "master") {
                         echo "===================================="
                         echo "🚀 IMAGE WILL BE PUSHED TO PROD REPO"
                         echo "Repo: ${PROD_REPO}"
                         echo "===================================="
-                    }
-                    else {
+                    } else {
                         echo "===================================="
                         echo "⚠️ NO DEPLOYMENT FOR THIS BRANCH"
                         echo "Branch: ${env.ACTUAL_BRANCH}"
@@ -71,35 +63,13 @@ pipeline {
 
                     def repo = ""
 
-
-                    if (env.BRANCH_NAME == "dev") {
-
-                        repo = DEV_REPO
-
-                        echo "===== DEV BRANCH DETECTED ====="
-                        echo "Pushing Docker image to DEV repository: ${repo}"
-
-                    } else if (env.BRANCH_NAME == "master") {
-
-                        repo = PROD_REPO
-
-                        echo "===== MASTER BRANCH DETECTED ====="
-                        echo "Pushing Docker image to PROD repository: ${repo}"
-
-                    } else {
-
-                        echo "===== NO DEPLOYMENT ====="
-                        echo "Branch: ${env.BRANCH_NAME} is not configured for Docker push"
-
                     if (env.ACTUAL_BRANCH == "dev") {
                         repo = DEV_REPO
                     } else if (env.ACTUAL_BRANCH == "master") {
                         repo = PROD_REPO
-
                     }
 
                     if (repo != "") {
-
                         withCredentials([usernamePassword(
                             credentialsId: 'dockerhub-cred',
                             usernameVariable: 'USERNAME',
@@ -113,12 +83,7 @@ pipeline {
                             """
                         }
 
-
-                        echo "===== SUCCESS ====="
-                        echo "Image pushed to ${repo}:${env.BUILD_NUMBER}"
-
                         echo "✅ Image successfully pushed to ${repo}:${env.BUILD_NUMBER}"
-
                     }
                 }
             }
