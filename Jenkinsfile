@@ -80,7 +80,7 @@ pipeline {
                     if (repo != "") {
 
                         withCredentials([usernamePassword(
-                            credentialsId: 'dockerhub-cred',
+                            credentialsId: 'dockerhub-creds',
                             usernameVariable: 'USERNAME',
                             passwordVariable: 'PASSWORD'
                         )]) {
