@@ -15,44 +15,32 @@ pipeline {
             }
         }
 
-        // ✅ BRANCH DETECTION 
         stage('Detect Branch') {
             steps {
                 script {
-                    echo "Raw GIT_BRANCH: ${env.GIT_BRANCH}"
-
-                    if (env.GIT_BRANCH) {
-                        env.ACTUAL_BRANCH = env.GIT_BRANCH.replace("origin/", "")
-                    } else {
-                        env.ACTUAL_BRANCH = "unknown"
-                    }
-
-                    echo "Detected branch: ${env.ACTUAL_BRANCH}"
+                    env.ACTUAL_BRANCH = sh(
+                        script: "git rev-parse --abbrev-ref HEAD",
+                        returnStdout: true
+                    ).trim()
+                    echo "Raw GIT_BRANCH: ${env.ACTUAL_BRANCH}"
                 }
             }
         }
 
-        // ✅ SHOW WHERE IMAGE WILL GO
         stage('Deployment Info') {
             steps {
                 script {
                     if (env.ACTUAL_BRANCH == "dev") {
-                        echo "===================================="
-                        echo "🚀 PUSHING TO DEV REPOSITORY"
-                        echo "Repo: ${DEV_REPO}"
-                        echo "===================================="
-                    } 
+                        echo "===== DEV BRANCH DETECTED ====="
+                        echo "Pushing Docker image to DEV repository: ${DEV_REPO}"
+                    }
                     else if (env.ACTUAL_BRANCH == "master") {
-                        echo "===================================="
-                        echo "🚀 PUSHING TO PROD REPOSITORY"
-                        echo "Repo: ${PROD_REPO}"
-                        echo "===================================="
-                    } 
+                        echo "===== MASTER BRANCH DETECTED ====="
+                        echo "Pushing Docker image to PROD repository: ${PROD_REPO}"
+                    }
                     else {
-                        echo "===================================="
-                        echo "⚠️ NO DEPLOYMENT FOR THIS BRANCH"
-                        echo "Branch: ${env.ACTUAL_BRANCH}"
-                        echo "===================================="
+                        echo "===== NO DEPLOYMENT ====="
+                        echo "Branch: ${env.ACTUAL_BRANCH} is not configured for Docker push"
                     }
                 }
             }
@@ -67,24 +55,19 @@ pipeline {
         stage('Push to DockerHub') {
             steps {
                 script {
-
                     def repo = ""
-
                     if (env.ACTUAL_BRANCH == "dev") {
                         repo = DEV_REPO
-                    } 
-                    else if (env.ACTUAL_BRANCH == "master") {
+                    } else if (env.ACTUAL_BRANCH == "master") {
                         repo = PROD_REPO
                     }
 
                     if (repo != "") {
-
                         withCredentials([usernamePassword(
                             credentialsId: 'dockerhub-creds',
                             usernameVariable: 'USERNAME',
                             passwordVariable: 'PASSWORD'
                         )]) {
-
                             sh """
                             echo \$PASSWORD | docker login -u \$USERNAME --password-stdin
                             docker tag $IMAGE_NAME ${repo}:\$BUILD_NUMBER
@@ -92,7 +75,8 @@ pipeline {
                             """
                         }
 
-                        echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER}"
+                        echo "===== SUCCESS ====="
+                        echo "Image pushed to ${repo}:${env.BUILD_NUMBER}"
                     }
                 }
             }
