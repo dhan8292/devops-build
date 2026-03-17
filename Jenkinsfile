@@ -9,59 +9,43 @@ pipeline {
 
     stages {
 
-        // ✅ Checkout code
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // ✅ Detect branch reliably (works for Multibranch Pipeline)
         stage('Detect Branch') {
             steps {
                 script {
-                    // Multibranch Pipeline automatically sets BRANCH_NAME
-                    env.ACTUAL_BRANCH = env.BRANCH_NAME ?: sh(
-                        script: 'git rev-parse --abbrev-ref HEAD',
-                        returnStdout: true
-                    ).trim()
+                    env.ACTUAL_BRANCH = env.BRANCH_NAME ?: "unknown"
                     echo "Detected branch: ${env.ACTUAL_BRANCH}"
                 }
             }
         }
 
-        // ✅ Show deployment info
         stage('Deployment Info') {
             steps {
                 script {
                     if (env.ACTUAL_BRANCH == "dev") {
-                        echo "===================================="
-                        echo "🚀 PUSHING TO DEV REPOSITORY"
-                        echo "Repo: ${DEV_REPO}"
-                        echo "===================================="
-                    } else if (env.ACTUAL_BRANCH == "master") {
-                        echo "===================================="
-                        echo "🚀 PUSHING TO PROD REPOSITORY"
-                        echo "Repo: ${PROD_REPO}"
-                        echo "===================================="
-                    } else {
-                        echo "===================================="
-                        echo "⚠️ NO DEPLOYMENT FOR THIS BRANCH"
-                        echo "Branch: ${env.ACTUAL_BRANCH}"
-                        echo "===================================="
+                        echo "🟢 DEV → ${DEV_REPO}"
+                    } 
+                    else if (env.ACTUAL_BRANCH == "master") {
+                        echo "🔴 PROD → ${PROD_REPO}"
+                    } 
+                    else {
+                        echo "⚠️ NO DEPLOYMENT for ${env.ACTUAL_BRANCH}"
                     }
                 }
             }
         }
 
-        // ✅ Build Docker image
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t $IMAGE_NAME ."
+                sh "docker build -t ${IMAGE_NAME} ."
             }
         }
 
-        // ✅ Push to DockerHub (only for dev or master)
         stage('Push to DockerHub') {
             when {
                 expression {
@@ -70,24 +54,39 @@ pipeline {
             }
             steps {
                 script {
-                    def repo = env.ACTUAL_BRANCH == "dev" ? DEV_REPO : PROD_REPO
+
+                    def repo = (env.ACTUAL_BRANCH == "dev") ? DEV_REPO : PROD_REPO
 
                     withCredentials([usernamePassword(
                         credentialsId: 'dockerhub-creds',
                         usernameVariable: 'USERNAME',
                         passwordVariable: 'PASSWORD'
                     )]) {
+
                         sh """
+                            docker logout || true
                             echo \$PASSWORD | docker login -u \$USERNAME --password-stdin
-                            docker tag $IMAGE_NAME ${repo}:\$BUILD_NUMBER
-                            docker tag $IMAGE_NAME ${repo}:latest
+
+                            echo "===== TAGGING IMAGE ====="
+                            docker tag ${IMAGE_NAME} ${repo}:\$BUILD_NUMBER
+
+                            echo "===== PUSHING IMAGE ====="
                             docker push ${repo}:\$BUILD_NUMBER
-                            docker push ${repo}:latest
                         """
                     }
-                    echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER} and ${repo}:latest"
+
+                    echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER}"
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 Pipeline SUCCESS"
+        }
+        failure {
+            echo "❌ Pipeline FAILED"
         }
     }
 }
