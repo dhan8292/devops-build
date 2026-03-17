@@ -9,14 +9,19 @@ pipeline {
 
     stages {
 
+
         // ✅ Checkout
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+
         // ✅ Detect Branch (Multibranch compatible)
+
+
         stage('Detect Branch') {
             steps {
                 script {
@@ -26,11 +31,15 @@ pipeline {
             }
         }
 
+
         // ✅ Show where image will be pushed
+
+
         stage('Deployment Info') {
             steps {
                 script {
                     if (env.ACTUAL_BRANCH == "dev") {
+
                         echo "===================================="
                         echo "🟢 DEV BRANCH DETECTED"
                         echo "Pushing to: ${DEV_REPO}"
@@ -47,19 +56,34 @@ pipeline {
                         echo "⚠️ NO DEPLOYMENT"
                         echo "Branch: ${env.ACTUAL_BRANCH}"
                         echo "===================================="
+
+                        echo "🟢 DEV → ${DEV_REPO}"
+                    } 
+                    else if (env.ACTUAL_BRANCH == "master") {
+                        echo "🔴 PROD → ${PROD_REPO}"
+                    } 
+                    else {
+                        echo "⚠️ NO DEPLOYMENT for ${env.ACTUAL_BRANCH}"
+
                     }
                 }
             }
         }
 
+
         // ✅ Build Docker Image
+
+
         stage('Build Docker Image') {
             steps {
                 sh "docker build -t ${IMAGE_NAME} ."
             }
         }
 
+
         // ✅ Push to DockerHub
+
+
         stage('Push to DockerHub') {
             when {
                 expression {
@@ -83,6 +107,7 @@ pipeline {
 
                             echo "===== TAGGING IMAGE ====="
                             docker tag ${IMAGE_NAME} ${repo}:\$BUILD_NUMBER
+
                             docker tag ${IMAGE_NAME} ${repo}:latest
 
                             echo "===== PUSH BUILD TAG ====="
@@ -96,6 +121,15 @@ pipeline {
                     echo "===== SUCCESS ====="
                     echo "Image pushed to ${repo}:${env.BUILD_NUMBER}"
                     echo "Image pushed to ${repo}:latest"
+
+
+                            echo "===== PUSHING IMAGE ====="
+                            docker push ${repo}:\$BUILD_NUMBER
+                        """
+                    }
+
+                    echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER}"
+
                 }
             }
         }
@@ -103,10 +137,12 @@ pipeline {
 
     post {
         success {
-            echo "🎉 Pipeline completed successfully!"
+        
+            echo "🎉 Pipeline SUCCESS"
         }
         failure {
-            echo "❌ Pipeline failed. Check logs above."
+            echo "❌ Pipeline FAILED"
+
         }
     }
 }
