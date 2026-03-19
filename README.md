@@ -83,25 +83,185 @@ System Requirements:
 Ubuntu 22.04 / Amazon Linux 2
 Open Ports: 22, 80, 8080, 3001
 Dockerfile:
-FROM node:18 as build
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
+# Use lightweight nginx image
 FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
+# Remove default nginx files
+RUN rm -rf /usr/share/nginx/html/*
+# Copy build files into nginx folder
+COPY build/ /usr/share/nginx/html/
+# Expose nginx port
 EXPOSE 80
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]
-Docker Compose:
+
+docker-compose.yml
 services:
 react-app:
 build: .
 container_name: react-devops
 ports:
 - "80:80"
-Deployment Steps:
-docker compose up -d --build
+- 
+build.sh:
+ #!/bin/bash
+ echo "Building Docker Image ..."
+ docker build -t react-devops-app .
+ echo "Build Completed"
+
+deploy.sh:
+#!/bin/bash
+set -e
+# ===== CONFIG =====
+IMAGE_NAME="react-devops-app"
+DEV_REPO="dhanu92/react-devops-dev"
+PROD_REPO="dhanu92/react-devops-prod"
+# ===== DETECT BRANCH =====
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo "Detected branch: $BRANCH"
+# ===== SIMULATE BUILD NUMBER =====
+# Jenkins sets BUILD_NUMBER automatically; here we simulate with timestamp
+export BUILD_NUMBER=$(date +%s)
+# ===== BUILD IMAGE =====
+echo "Building Docker image..."
+docker build -t $IMAGE_NAME .
+# ===== LOGIN TO DOCKERHUB =====
+echo "Logging in to DockerHub..."
+docker login -u "$DOCKERHUB_USERNAME" -p "$DOCKERHUB_PASSWORD"
+# ===== TAG & PUSH =====
+if [ "$BRANCH" = "dev" ]; then
+    echo "🟢 Pushing to DEV repo: $DEV_REPO"
+    docker tag $IMAGE_NAME $DEV_REPO:$BUILD_NUMBER
+    docker push $DEV_REPO:$BUILD_NUMBER
+
+elif [ "$BRANCH" = "master" ]; then
+    echo "🔴 Pushing to PROD repo (private): $PROD_REPO"
+    docker tag $IMAGE_NAME $PROD_REPO:$BUILD_NUMBER
+    docker push $PROD_REPO:$BUILD_NUMBER
+
+else
+    echo "⚠️ No deployment configured for branch: $BRANCH"
+    exit 0
+fi
+# ===== DEPLOY CONTAINER =====
+echo "Stopping old container ..."
+docker stop react-container || true
+docker rm react-container || true
+echo "Running new container ..."
+docker run -d -p 80:80 --name react-container $IMAGE_NAME
+echo "✅ Deployment completed"
+
+Jenkinsfile:
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "react-devops-app"
+        DEV_REPO   = "dhanu92/react-devops-dev"
+        PROD_REPO  = "dhanu92/react-devops-prod"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Detect Branch') {
+            steps {
+                script {
+                    env.ACTUAL_BRANCH = env.BRANCH_NAME ?: "unknown"
+                    echo "Detected branch: ${env.ACTUAL_BRANCH}"
+                }
+            }
+        }
+
+        stage('Deployment Info') {
+            steps {
+                script {
+
+                    if (env.ACTUAL_BRANCH == "dev") {
+                        echo "===================================="
+                        echo "🟢 DEV BRANCH DETECTED"
+                        echo "Repo: ${DEV_REPO}"
+                        echo "===================================="
+                    }
+                    else if (env.ACTUAL_BRANCH == "master") {
+                        echo "===================================="
+                        echo "🔴 MASTER BRANCH DETECTED"
+                        echo "Repo: ${PROD_REPO}"
+                        echo "===================================="
+                    }
+                    else {
+                        echo "===================================="
+                        echo "⚠️ NO DEPLOYMENT"
+                        echo "Branch: ${env.ACTUAL_BRANCH}"
+                        echo "===================================="
+                    }
+
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME} ."
+            }
+        }
+
+        stage('Push to DockerHub') {
+            when {
+                expression {
+                    return env.ACTUAL_BRANCH == "dev" || env.ACTUAL_BRANCH == "master"
+                }
+            }
+            steps {
+                script {
+
+                    def repo = ""
+
+                    if (env.ACTUAL_BRANCH == "dev") {
+                        repo = DEV_REPO
+                    }
+                    else if (env.ACTUAL_BRANCH == "master") {
+                        repo = PROD_REPO
+                    }
+
+                    withCredentials([usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'USERNAME',
+                        passwordVariable: 'PASSWORD'
+                    )]) {
+
+                        sh """
+                            docker logout || true
+                            echo \$PASSWORD | docker login -u \$USERNAME --password-stdin
+
+                            echo "===== TAGGING IMAGE ====="
+                            docker tag ${IMAGE_NAME} ${repo}:\$BUILD_NUMBER
+
+                            echo "===== PUSHING IMAGE ====="
+                            docker push ${repo}:\$BUILD_NUMBER
+                        """
+                    }
+
+                    echo "✅ SUCCESS: Image pushed to ${repo}:${env.BUILD_NUMBER}"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 Pipeline SUCCESS"
+        }
+        failure {
+            echo "❌ Pipeline FAILED"
+        }
+    }
+}
+
 Jenkins:
 Access at http://EC2_PUBLIC_IP:8080
 Create Freestyle job and add execute shell:
@@ -110,7 +270,7 @@ docker compose up -d --build
 Monitoring:
 docker run -d -p 3001:3001 --name uptime-kuma louislam/uptime-kuma
 Access:
-http://EC2_PUBLIC_IP :34.210.234.27
+http://EC2_PUBLIC_IP :http://13.233.51.80/
 http://EC2_PUBLIC_IP:8080
 http://EC2_PUBLIC_IP:3001
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
